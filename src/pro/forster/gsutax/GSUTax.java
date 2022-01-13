@@ -71,7 +71,7 @@ class GSUTax {
             .filter(p -> p.getName().equals("Morgan Stanley")).findAny().get()
             .getTransactions().stream()
             .filter(t -> t.getType() == PortfolioTransaction.Type.DELIVERY_INBOUND)
-            .filter(t -> t.getDateTime().isAfter(LocalDateTime.of(2019, Month.MARCH, 1, 0, 0))),
+            .filter(t -> !t.getDateTime().isBefore(LocalDateTime.of(2019, Month.MARCH, 1, 0, 0))),
         client.getAccounts().stream()
             .filter(a -> a.getName().equals("OFX")).findAny().get()
             .getTransactions().stream()
