@@ -1,0 +1,10 @@
+{
+  "java.project.referencedLibraries": [
+    "/home/forster/portfolio/plugins/name.abuchen.portfolio_0.56.3.jar",
+    "/home/forster/portfolio/plugins/org.apache.servicemix.bundles.xstream_1.4.18.1.jar",
+    "/home/forster/portfolio/plugins/org.apache.servicemix.bundles.xpp3_1.1.4.c.jar",
+    "/home/forster/portfolio/plugins/com.google.protobuf_3.18.0.jar",
+    "/home/forster/portfolio/plugins/org.eclipse.osgi_3.17.0.v20210823-1805.jar",
+    "/home/forster/portfolio/plugins/org.eclipse.equinox.common_3.15.0.v20210518-0604.jar"
+  ]
+}
