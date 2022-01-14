@@ -6,7 +6,10 @@ import java.time.LocalDateTime;
 import java.time.Month;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
+
+import com.google.common.collect.ImmutableList;
 
 import name.abuchen.portfolio.model.AccountTransaction;
 import name.abuchen.portfolio.model.Client;
@@ -23,80 +26,48 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 
 class GSUTax {
-  static class TaxEvent {
-    List<PortfolioTransaction> deliveries = new ArrayList<>();
-    PortfolioTransaction sale;
-    AccountTransaction transfer;
-
-    void validate() {
-      if (sale.getShares() != deliveries.stream().mapToLong(PortfolioTransaction::getShares).sum()) {
-        throw new AssertionError("Sale doesn't match deliveries: \n" + this.toString());
-      }
-      if (deliveries.isEmpty()) {
-        throw new AssertionError("Didn't find deliveries for sale: \n" + this.toString());
-      }
-    }
-
-    int getYear() {
-      return transfer.getDateTime().getYear();
-    }
-
-    Money getTotalDeliveryEurAmount(CurrencyConverter converter) {
-      return deliveries.stream()
-          .map(d -> converter.convert(d.getDateTime(), d.getMonetaryAmount()))
-          .reduce(Money::add).get();
-    }
-
-    Money getProfit(CurrencyConverter converter) {
-      return transfer.getMonetaryAmount().subtract(getTotalDeliveryEurAmount(converter));
-    }
-
-    @Override
-    public String toString() {
-
-      var b = new StringBuilder();
-      for (var d : deliveries) {
-        b.append(d).append(' ').append(d.getShares() / 100000000.0).append('\n');
-      }
-      b.append(sale).append(' ').append(sale.getShares() / 100000000.0).append('\n');
-      b.append(transfer).append('\n');
-
-      return b.toString();
-    }
-  }
 
   static List<Transaction> collectTransactions(Client client) {
     return Stream.concat(
         client.getPortfolios().stream()
             .filter(p -> p.getName().equals("Morgan Stanley")).findAny().get()
             .getTransactions().stream()
-            .filter(t -> t.getType() == PortfolioTransaction.Type.DELIVERY_INBOUND)
-            .filter(t -> !t.getDateTime().isBefore(LocalDateTime.of(2019, Month.MARCH, 1, 0, 0))),
+            .filter(t -> !t.getDateTime().isBefore(LocalDateTime.of(2018, Month.DECEMBER, 1, 0, 0))),
         client.getAccounts().stream()
             .filter(a -> a.getName().equals("OFX")).findAny().get()
             .getTransactions().stream()
-            .map(t -> t.getCrossEntry().getCrossTransaction(t)))
+            .map(t -> t.getCrossEntry().getCrossTransaction(t))
+            .filter(t -> t instanceof AccountTransaction))
         .sorted(new Transaction.ByDate())
         .collect(toList());
   }
 
   static List<TaxEvent> createTaxEvents(List<Transaction> transactions) {
     var events = new ArrayList<TaxEvent>();
-    var event = new TaxEvent();
+
+    var deliveries = new ImmutableList.Builder<Transaction>();
+    var sale = Optional.<Transaction>empty();
+    var transfer = Optional.<Transaction>empty();
 
     for (var t : transactions) {
       if (t instanceof PortfolioTransaction) {
-        var pt = (PortfolioTransaction) t;
-        if (pt.getType() == PortfolioTransaction.Type.DELIVERY_INBOUND) {
-          event.deliveries.add(pt);
+        if (((PortfolioTransaction) t).getType() == PortfolioTransaction.Type.DELIVERY_INBOUND) {
+          deliveries.add(t);
         } else {
-          event.sale = pt;
+          if (sale.isPresent()) {
+            throw new AssertionError("Found duplicate sale: \n" + sale + t);
+          }
+          sale = Optional.of(t);
         }
       } else {
-        event.transfer = (AccountTransaction) t;
-        event.validate();
-        events.add(event);
-        event = new TaxEvent();
+        transfer = Optional.of(t);
+      }
+
+      if (transfer.isPresent() || (sale.isPresent() && sale.get().getCurrencyCode().equals("EUR"))) {
+        events.add(new TaxEvent(deliveries.build(), sale.get(), transfer));
+        deliveries = new ImmutableList.Builder<>();
+        sale = Optional.empty();
+        transfer = Optional.empty();
       }
     }
 
@@ -119,7 +90,7 @@ class GSUTax {
       System.out.printf("\n================== %d\n\n", year);
 
       for (var e : yearlyEvents) {
-        for (var d : e.deliveries) {
+        for (var d : e.getDeliveries()) {
           System.out.printf("Einlieferung: %s %8.4f %s (%s, %6.4f USD/EUR)\n",
               d.getDateTime().format(ISO_LOCAL_DATE),
               d.getShares() / 100000000.,
@@ -130,9 +101,9 @@ class GSUTax {
         System.out.printf("Einstandswert gesamt:             %s\n", e.getTotalDeliveryEurAmount(converter));
 
         System.out.printf("Verkauf:      %s %8.4f %s\n",
-            e.sale.getDateTime().format(ISO_LOCAL_DATE),
-            e.sale.getShares() / 100000000.,
-            e.transfer.getMonetaryAmount());
+            e.getSale().getDateTime().format(ISO_LOCAL_DATE),
+            e.getSale().getShares() / 100000000.,
+            e.getMonetaryAmount());
         System.out.printf("Gewinn/Verlust:                   %s\n", e.getProfit(converter));
         System.out.println();
       }
