@@ -30,7 +30,7 @@ class GSUTax {
   static List<Transaction> collectTransactions(Client client) {
     return Stream.concat(
         client.getPortfolios().stream()
-            .filter(p -> p.getName().equals("Morgan Stanley")).findAny().get()
+            .filter(p -> p.getName().equals("Morgan Stanley - Google")).findAny().get()
             .getTransactions().stream()
             .filter(t -> !t.getDateTime().isBefore(LocalDateTime.of(2018, Month.DECEMBER, 1, 0, 0))),
         client.getAccounts().stream()
@@ -38,7 +38,7 @@ class GSUTax {
             .getTransactions().stream()
             .map(t -> t.getCrossEntry().getCrossTransaction(t))
             .filter(t -> t instanceof AccountTransaction))
-        .sorted(new Transaction.ByDate())
+        .sorted(Transaction.BY_DATE)
         .collect(toList());
   }
 
@@ -115,7 +115,7 @@ class GSUTax {
   }
 
   public static void main(String[] args) throws IOException {
-    FileInputStream input = new FileInputStream("/home/forster/data/Dokumente/Finanzen/Portfolio.xml");
+    FileInputStream input = new FileInputStream("Portfolio.xml");
     var client = ClientFactory.load(input);
     var transactions = collectTransactions(client);
     var events = createTaxEvents(transactions);

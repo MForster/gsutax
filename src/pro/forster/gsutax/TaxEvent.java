@@ -23,7 +23,7 @@ class TaxEvent {
     this.transfer = checkNotNull(transfer);
 
     checkArgument(sale.getShares() == deliveries.stream().mapToLong(Transaction::getShares).sum(),
-        "Sale doesn't match deliveries: %s %", sale, deliveries);
+        "Sale doesn't match deliveries: %s %s", sale, deliveries);
     checkArgument(!deliveries.isEmpty(),
         "Didn't find deliveries for sale: %s", sale);
     checkArgument(transfer.isPresent() || sale.getCurrencyCode().equals("EUR"),
